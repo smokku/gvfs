@@ -542,6 +542,16 @@ trait ZipArchiveAccess {
 
 impl<T: Read + Seek> ZipArchiveAccess for zip::ZipArchive<T> {
     fn by_name(&mut self, name: &str) -> zip::result::ZipResult<zip::read::ZipFile> {
+        let name = if let Some(chr) = name.chars().next() {
+            if chr == '/' {
+                &name[1..]
+            } else {
+                name
+            }
+        } else {
+            name
+        };
+
         self.by_name(name)
     }
 
@@ -796,6 +806,13 @@ impl VFS for ZipFS {
         let itr = self
             .index
             .iter()
+            .map(|s| {
+                if !s.starts_with('/') {
+                    format!("/{}", s)
+                } else {
+                    s.to_string()
+                }
+            })
             .filter(|s| s.starts_with(path))
             .map(|s| Ok(PathBuf::from(s)))
             .collect::<Vec<_>>();
@@ -958,7 +975,8 @@ mod tests {
                 .start_file("fake_file_name.txt", zip::write::FileOptions::default())
                 .unwrap();
             let _bytes = zip_archive.write(b"Zip contents!").unwrap();
-            zip_archive.add_directory("fake_dir", zip::write::FileOptions::default())
+            zip_archive
+                .add_directory("fake_dir", zip::write::FileOptions::default())
                 .unwrap();
             zip_archive
                 .start_file("fake_dir/file.txt", zip::write::FileOptions::default())
@@ -977,11 +995,11 @@ mod tests {
     fn test_zip_files() {
         let zfs = make_zip_fs();
 
-        assert!(zfs.exists(Path::new("fake_file_name.txt".into())));
+        assert!(zfs.exists(Path::new("/fake_file_name.txt")));
 
         let mut contents = String::new();
         let _bytes = zfs
-            .open(Path::new("fake_file_name.txt"))
+            .open(Path::new("/fake_file_name.txt"))
             .unwrap()
             .read_to_string(&mut contents)
             .unwrap();
@@ -993,16 +1011,14 @@ mod tests {
         let fs = make_zip_fs();
         let testdir = Path::new("/testdir");
         let testfile = Path::new("/file1.txt");
-        // TODO: Fix absolute vs. relative paths for zip files...
-        let existing_file = Path::new("fake_file_name.txt");
-        let existing_dir = Path::new("fake_dir");
+        let existing_file = Path::new("/fake_file_name.txt");
+        let existing_dir = Path::new("/fake_dir");
 
         assert!(!fs.exists(testfile));
         assert!(!fs.exists(testdir));
         assert!(fs.exists(existing_file));
         // TODO: This fails, why?
         //assert!(fs.exists(existing_dir));
-
 
         // Create and delete test dir -- which always fails
         assert!(fs.mkdir(testdir).is_err());
@@ -1025,10 +1041,10 @@ mod tests {
 
             // TODO: Fix
             /*
-            let m = fs.metadata(existing_dir).unwrap();
-            assert!(!m.is_file());
-            assert!(m.is_dir());
-*/
+                        let m = fs.metadata(existing_dir).unwrap();
+                        assert!(!m.is_file());
+                        assert!(m.is_dir());
+            */
 
             assert!(fs.metadata(testfile).is_err());
         }
@@ -1048,7 +1064,6 @@ mod tests {
 
         assert!(fs.rmrf(testdir).is_err());
         assert!(fs.rmrf(existing_dir).is_err());
-
     }
 
     // BUGGO: TODO: Make sure all functions are tested for OverlayFS and ZipFS!!
