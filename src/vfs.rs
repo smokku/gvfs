@@ -972,14 +972,20 @@ mod tests {
             let mut zip_archive = zip::ZipWriter::new(zip_bytes);
 
             zip_archive
-                .start_file("fake_file_name.txt", zip::write::FileOptions::default())
+                .start_file(
+                    "fake_file_name.txt",
+                    zip::write::SimpleFileOptions::default(),
+                )
                 .unwrap();
             let _bytes = zip_archive.write(b"Zip contents!").unwrap();
             zip_archive
-                .add_directory("fake_dir", zip::write::FileOptions::default())
+                .add_directory("fake_dir", zip::write::SimpleFileOptions::default())
                 .unwrap();
             zip_archive
-                .start_file("fake_dir/file.txt", zip::write::FileOptions::default())
+                .start_file(
+                    "fake_dir/file.txt",
+                    zip::write::SimpleFileOptions::default(),
+                )
                 .unwrap();
             let _bytes = zip_archive.write(b"Zip contents!").unwrap();
 
